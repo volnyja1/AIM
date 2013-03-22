@@ -1,0 +1,4 @@
+AIM
+---
+
+AIM semestral work
