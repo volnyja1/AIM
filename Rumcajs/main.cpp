@@ -5,6 +5,7 @@
 #include "../IL/ilu.h"
 #include "../IL/ilut.h"
 #include "Polygon.h"
+#include "TexCoords.h"
 
 using namespace std;
 
@@ -12,14 +13,18 @@ int WIDTH = 640;
 int HEIGHT = 480;
 
 enum primitive{
-	QUAD = 0,
+	POLYGON = 0,
+	QUAD,
 	STRIP,
 	FAN,
-	POLYGON
 };
 
-bool edge = false;
+bool edge = true;
+bool deselect = false;
+bool selectFlag = false;
 int prim = 0;
+int polX = 1;
+int polY = 1;
 
 GLuint textureID;
 
@@ -36,6 +41,7 @@ GLfloat MAGENTA[3] = {1,0,1};
 const float DEG2RAD = 3.14159/180;
 
 vector<MyPolygon> polygons;
+int original = 0;
 
 void drawCircle(float x, float y, float r, float s);
 
@@ -105,16 +111,18 @@ int loadTextures(){
 }
 
 void Vertex::drawVertex(){
-    float i;
-    float s = (3.14 * 2 / 25);
-	float r = 2.0f;
-	glColor3fv(RED);
-    glBegin(GL_POLYGON);
-    for(i = 3.14; i >= -3.14; i -= s)
-    {
-        glVertex2f(x + cos(i) * r, y + sin(i) * r);
-    }
-    glEnd();
+	if(selectable){
+		float i;
+		float s = (3.14 * 2 / 25);
+		float r = 2.0f;
+		glColor3fv(RED);
+		glBegin(GL_POLYGON);
+		for(i = 3.14; i >= -3.14; i -= s)
+		{
+			glVertex2f(x + cos(i) * r, y + sin(i) * r);
+		}
+		glEnd();
+	}
 }
 
 void MyPolygon::drawPolygon(){
@@ -125,13 +133,17 @@ void MyPolygon::drawPolygon(){
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, textureID);
 			glBegin(GL_POLYGON);
-				glTexCoord2f(0, 0);
+				//glTexCoord2f(0, 0);
+				glTexCoord2f(getTexX0(), getTexY0());
 				glVertex2f(vertices[0].getX(),vertices[0].getY());
-				glTexCoord2f(0, 1);
+				//glTexCoord2f(0, 1);
+				glTexCoord2f(getTexX0(), getTexY1());
 				glVertex2f(vertices[1].getX(),vertices[1].getY());
-				glTexCoord2f(1, 1);
+				//glTexCoord2f(1, 1);
+				glTexCoord2f(getTexX1(), getTexY1());
 				glVertex2f(vertices[2].getX(),vertices[2].getY());
-				glTexCoord2f(1, 0);
+				//glTexCoord2f(1, 0);
+				glTexCoord2f(getTexX1(), getTexY0());
 				glVertex2f(vertices[3].getX(),vertices[3].getY());
 			glEnd();
 			break;
@@ -230,7 +242,7 @@ void MyPolygon::drawPolygon(){
 
 void drawPolygons()
 {
-	for (unsigned int i=0; i<polygons.size(); i++)
+	for (unsigned int i=original+1; i<polygons.size(); i++)
 		polygons[i].drawPolygon();
 }
 
@@ -278,9 +290,38 @@ void reshape(int w, int h)
     glLoadIdentity();
 }
 
-void spindisplay(void)
-{       
-    //glutPostRedisplay();
+void recalculatePolygons(){
+	if(polygons.size() != original+1){
+		for(int i=polygons.size(); i>original+1; i--){
+			polygons.pop_back();
+		}
+	}
+	for(int i = 0; i <= original; i++){
+		int x0 = polygons[i].getV0().getX();
+		int y0 = polygons[i].getV0().getY();
+		int x1 = polygons[i].getV1().getX();
+		int y1 = polygons[i].getV1().getY();
+		int x2 = polygons[i].getV2().getX();
+		int y2 = polygons[i].getV2().getY();
+		int x3 = polygons[i].getV3().getX();
+		int y3 = polygons[i].getV3().getY();
+		int divX = (x2-x0)/polX;
+		int divY = (y1-y0)/polY;
+		for(int j=0; j<polX; j++){
+			for(int k=0; k<polY; k++){
+				polygons.push_back(MyPolygon(Vertex(x0+j*divX,y0+k*divY),
+										     Vertex(x0+j*divX,y0+(k+1)*divY),
+											 Vertex(x0+(j+1)*divX,y0+(k+1)*divY),
+											 Vertex(x0+(j+1)*divX,y0+k*divY),
+											 
+											 (float)j*(1.0f/(float)polX), // s0
+											 (float)k*(1.0f/(float)polY), // t0
+											 (float)(j+1)*(1.0f/(float)polX),   // s1
+											 (float)(k+1)*(1.0f/(float)polY))); // t1
+			}
+		}
+	}
+	glutPostRedisplay();
 }
 
 void keyboard(unsigned char key, int x, int y)
@@ -288,8 +329,14 @@ void keyboard(unsigned char key, int x, int y)
     switch (key)
     {
 	case 'q' : exit(0); break;
-	case 'e' : edge = !edge; cout << edge << endl; break;
+	case 'e' : edge = !edge; glutPostRedisplay(); break;
+	case 'd' : deselect = !deselect; glutPostRedisplay(); break;
+	case 's' : selectFlag = !selectFlag; glutPostRedisplay(); break;
 	case 'a' : prim = (prim==3)?0:prim+1; break;
+	case 'X' : polX++; recalculatePolygons(); break;
+	case 'x' : polX = (polX==1)?1:polX-1; recalculatePolygons(); break;
+	case 'Y' : polY++; recalculatePolygons(); break;
+	case 'y' : polY = (polY==1)?1:polY-1; recalculatePolygons(); break;
     }
 }
 
@@ -298,8 +345,16 @@ void mouse(int btn, int state, int x, int y)
 {
     if(btn==GLUT_LEFT_BUTTON && state==GLUT_DOWN)   
     {
+		if(selectFlag)
+			for (unsigned int i=0; i<polygons.size(); i++)
+				polygons[i].select(x,y*1.04);
+		if(deselect)
+			for (unsigned int i=0; i<polygons.size(); i++)
+				polygons[i].deselect(x,y*1.04);
+
 		for (unsigned int i=0; i<polygons.size(); i++)
 			polygons[i].hit(x,y*1.04);
+
         glutPostRedisplay();
     }
 	if(btn==GLUT_LEFT_BUTTON && state==GLUT_UP)   
@@ -310,7 +365,7 @@ void mouse(int btn, int state, int x, int y)
     }
     if(btn==GLUT_RIGHT_BUTTON && state==GLUT_DOWN)   
     {
-        exit(1);   // To Exit the Program
+        //exit(1);   // To Exit the Program
     }
 }
 
@@ -330,7 +385,6 @@ int main(int argc, char **argv)
     glutReshapeFunc(reshape);
     glutMouseFunc(mouse);
 	glutKeyboardFunc(keyboard);
-    glutIdleFunc(spindisplay);
 	init();
     glutMainLoop();
 }

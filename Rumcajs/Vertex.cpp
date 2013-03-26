@@ -36,6 +36,18 @@ void Vertex::hit(int _x, int _y){
 	}
 }
 
+void Vertex::select(int _x, int _y){
+	if(_x > x-range && _x < x+range && _y > y-range && _y < y+range){
+		setSelectable(true);
+	}
+}
+
+void Vertex::deselect(int _x, int _y){
+	if(_x > x-range && _x < x+range && _y > y-range && _y < y+range){
+		setSelectable(false);
+	}
+}
+
 void Vertex::move(int _x, int _y){
 	x = _x;
 	y = _y;
@@ -47,5 +59,10 @@ bool Vertex::isSelected(){
 }
 
 void Vertex::setSelected(bool _selected){
-	selected = _selected;
+	if(selectable)
+		selected = _selected;
+}
+
+void Vertex::setSelectable(bool _selectable){
+	selectable = _selectable;
 }
