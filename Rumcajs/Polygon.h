@@ -8,6 +8,7 @@ public:
 	MyPolygon(Vertex v0, Vertex v1, Vertex v2, Vertex v3,float _texX0, float _texY0, float _texX1, float _texY1);
 	~MyPolygon();
 	void drawPolygon();
+	void transformPolygon();
 	void hit(int _x, int _y);
 	void select(int _x, int _y);
 	void deselect(int _x, int _y);

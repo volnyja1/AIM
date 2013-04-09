@@ -3,7 +3,7 @@
 Vertex::Vertex(){
 	x = 0;
 	y = 0;
-	range = 20;
+	range = 10;
 }
 
 Vertex::~Vertex(){
@@ -12,7 +12,7 @@ Vertex::~Vertex(){
 Vertex::Vertex(int _x, int _y){
 	x = _x;
 	y = _y;
-	range = 20;
+	range = 10;
 }
 
 void Vertex::setVertex(int _x, int _y){
@@ -49,13 +49,23 @@ void Vertex::deselect(int _x, int _y){
 }
 
 void Vertex::move(int _x, int _y){
-	x = _x;
-	y = _y;
-	setSelected(false);
+	if(selected){
+		x = _x;
+		y = _y;
+	}
+	//setSelected(false);
 }
 
 bool Vertex::isSelected(){
 	return selected;
+}
+
+bool Vertex::isSelectable(){
+	return selectable;
+}
+
+void Vertex::setDeselected(){
+	setSelected(false);
 }
 
 void Vertex::setSelected(bool _selected){
