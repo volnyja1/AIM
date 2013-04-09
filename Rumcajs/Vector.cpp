@@ -10,6 +10,11 @@ Vector::Vector(float _x, float _y){
 	y = _y;
 }
 
+Vector::Vector(Vertex v){
+	x = v.getX();
+	y = v.getY();
+}
+
 Vector::~Vector(){}
 
 void Vector::setVector(float _x, float _y){
@@ -24,6 +29,9 @@ void Vector::addVector(Vector v){
 
 Vector Vector::addedVector(Vector v){
 	return Vector(x+v.getX(), y+v.getY());
+}
+Vector Vector::subtractedVector(Vector v){
+	return Vector(x-v.getX(), y-v.getY());
 }
 
 Vector Vector::perpendicularVector(){

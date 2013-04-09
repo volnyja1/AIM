@@ -17,7 +17,7 @@ public:
 	void hit(int _x, int _y);
 	void move(int _x, int _y);
 	void drawVertex();
-	void drawVertex(GLfloat *col, float r);
+	void drawVertex(int col, float r);
 	void deleteVertex(int _x, int _y);
 	int getX();
 	int getY();

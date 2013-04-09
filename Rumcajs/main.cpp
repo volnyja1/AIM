@@ -42,6 +42,11 @@ GLfloat YELLOW[3] = {1,1,0};
 GLfloat CYAN[3] = {0,1,1};
 GLfloat MAGENTA[3] = {1,0,1};
 
+enum color{
+	C_RED = 0,
+	C_BLUE,
+};
+
 ILubyte* imageData;
 ILuint texWidth,texHeight;
 
@@ -137,10 +142,14 @@ void Vertex::drawVertex(){
 	}
 }
 
-void Vertex::drawVertex(GLfloat *col, float r){
+void Vertex::drawVertex(int col, float r){
 		float i;
 		float s = (3.14 * 2 / 25);
-		glColor3fv(col);
+		switch(col)
+		{
+		case C_RED: glColor3fv(RED); break;
+		case C_BLUE: glColor3fv(BLUE); break;
+		}
 		glBegin(GL_POLYGON);
 		for(i = 3.14; i >= -3.14; i -= s)
 		{
@@ -151,12 +160,12 @@ void Vertex::drawVertex(GLfloat *col, float r){
 
 void drawControlPoints(){
 		for(unsigned int i = 0; i < oldControlPoints.size(); i++)
-			oldControlPoints[i].drawVertex(RED, 3);
+			oldControlPoints[i].drawVertex(C_RED, 3);
 		for(unsigned int i = 0; i < controlPoints.size(); i++)
-			controlPoints[i].drawVertex(BLUE, 3);
+			controlPoints[i].drawVertex(C_BLUE, 3);
 	if(drawControlPointsFlag){
-		centroidP.drawVertex(RED, 4);
-		centroidQ.drawVertex(BLUE, 4);
+		centroidP.drawVertex(C_RED, 4);
+		centroidQ.drawVertex(C_BLUE, 4);
 	}
 }
 
@@ -217,52 +226,123 @@ void drawPolygons()
 }
 
 void setCentroids(){
-	int sumPx = 0;
-	int sumQx = 0;
-	int sumPy = 0;
-	int sumQy = 0;
-	for(unsigned int i=0; i<controlPoints.size(); i++){
-		sumPx += oldControlPoints[i].getX();
-		sumPy += oldControlPoints[i].getY();
-		sumQx += controlPoints[i].getX();
-		sumQy += controlPoints[i].getY();
-	}
-	centroidP.setVertex(sumPx/controlPoints.size(), sumPy/controlPoints.size());
-	centroidQ.setVertex(sumQx/controlPoints.size(), sumQy/controlPoints.size());
+	if(controlPoints.size()==0){
+		centroidP.setVertex(1,1);
+		centroidQ.setVertex(1,1);
+	} else {
+		int sumPx = 0;
+		int sumQx = 0;
+		int sumPy = 0;
+		int sumQy = 0;
+		for(unsigned int i=0; i<controlPoints.size(); i++){
+			sumPx += oldControlPoints[i].getX();
+			sumPy += oldControlPoints[i].getY();
+			sumQx += controlPoints[i].getX();
+			sumQy += controlPoints[i].getY();
+		}
+		centroidP.setVertex(sumPx/controlPoints.size(), sumPy/controlPoints.size());
+		centroidQ.setVertex(sumQx/controlPoints.size(), sumQy/controlPoints.size());
 
-	centeredControlPoints.clear();
-	centeredOldControlPoints.clear();
-	for(unsigned int i=0; i<controlPoints.size(); i++){
-		centeredControlPoints.push_back(Vertex(controlPoints[i].getX()-centroidQ.getX(),controlPoints[i].getX()-centroidQ.getX()));
-		centeredOldControlPoints.push_back(Vertex(oldControlPoints[i].getX()-centroidP.getX(),oldControlPoints[i].getY()-centroidP.getY()));
+		centeredControlPoints.clear();
+		centeredOldControlPoints.clear();
+		for(unsigned int i=0; i<controlPoints.size(); i++){
+			centeredControlPoints.push_back(Vertex(controlPoints[i].getX()-centroidQ.getX(),controlPoints[i].getY()-centroidQ.getY()));
+			centeredOldControlPoints.push_back(Vertex(oldControlPoints[i].getX()-centroidP.getX(),oldControlPoints[i].getY()-centroidP.getY()));
+		}
 	}
-
 }
 
 /**
 * Do the magic functions
 */
 
-void AsSimilarAsPossible(){
+Vector AsSimilarAsPossible(Vertex v){
+	float mu = 0.0f;
+	Matrix R;
+	for(unsigned int j=0; j<controlPoints.size(); j++){
+		double w = 1.0/sqrt(pow((double)v.getX()-(double)oldControlPoints[j].getX(),2.0)+pow((double)v.getY()-(double)oldControlPoints[j].getY(),2.0));
+		//cout << w << endl;
+		/*
+		cout << "---------------------------------" << endl;
+		cout << centeredControlPoints[j].getX() << " " << centeredControlPoints[j].getY() << endl;
+		cout << Vector(centeredControlPoints[j]).getX() << " " << Vector(centeredControlPoints[j]).getY() << endl;
+		cout << Vector(centeredControlPoints[j]).dotProduct(Vector(centeredOldControlPoints[j])) << endl;
+		cout << "---------------------------------" << endl;
+		*/
+		mu += w*Vector(centeredOldControlPoints[j]).dotProduct(Vector(centeredOldControlPoints[j]));
+		//cout << "mu: " << mu << endl;
+		Matrix R2 = Matrix(Vector(centeredOldControlPoints[j].getX(),centeredOldControlPoints[j].getY()),
+							Vector(centeredOldControlPoints[j].getX(),centeredOldControlPoints[j].getY()).perpendicularVector());
+		R2.multiplyMatrixRight(Matrix(Vector(centeredControlPoints[j].getX(),centeredControlPoints[j].getY()),
+										Vector(centeredControlPoints[j].getX(),centeredControlPoints[j].getY()).perpendicularVector(),0));
+		R2.multiplyMatrix(w);
+		R.addMatrix(R2);
+	}
+	//cout << "mu: " << mu << endl;
+	R.multiplyMatrix(1.0f/mu);
+	//R.write();
 
+	//slides
+	//Vector t = Vector(Vector(centroidQ.getX(),centroidQ.getY()).subtractedVector(R.multipliedVector(Vector(centroidP.getX(),centroidP.getY()))));
+	
+	// paper
+	Vector t = Vector(Vector(centroidP.getX(),centroidP.getY()).subtractedVector(R.multipliedVector(Vector(centroidQ.getX(),centroidQ.getY()))));
+	
+	//cout << "original: " << vertices[i].getX() << " " << vertices[i].getY() << endl;
+	Vector transformed = R.multipliedVector(Vector(v));
+	//cout << "transformed: " << transformed.getX() << " " << transformed.getY() << endl;
+	transformed.addVector(t);
+	return transformed;
 }
 
-void AsRigidAsPossible(){
+Vector AsRigidAsPossible(Vertex v){
+	double mu1 = 0.0;
+	double mu2 = 0.0;
+	Matrix R;
+	for(unsigned int j=0; j<controlPoints.size(); j++){
+		double w = 1.0/sqrt(pow((double)v.getX()-(double)oldControlPoints[j].getX(),2.0)+pow((double)v.getY()-(double)oldControlPoints[j].getY(),2.0));
+		//cout << w << endl;
+		/*
+		cout << "---------------------------------" << endl;
+		cout << centeredControlPoints[j].getX() << " " << centeredControlPoints[j].getY() << endl;
+		cout << Vector(centeredControlPoints[j]).getX() << " " << Vector(centeredControlPoints[j]).getY() << endl;
+		cout << Vector(centeredControlPoints[j]).dotProduct(Vector(centeredOldControlPoints[j])) << endl;
+		cout << "---------------------------------" << endl;
+		*/
+		mu1 += w*Vector(centeredControlPoints[j]).dotProduct(Vector(centeredOldControlPoints[j]));
+		//cout << "mu: " << mu1 << endl;
+		mu2 += w*Vector(centeredControlPoints[j]).dotProduct(Vector(centeredOldControlPoints[j]).perpendicularVector());
+		//cout << "mu: " << mu2 << endl;
+		Matrix R2 = Matrix(Vector(centeredOldControlPoints[j].getX(),centeredOldControlPoints[j].getY()),
+						   Vector(centeredOldControlPoints[j].getX(),centeredOldControlPoints[j].getY()).perpendicularVector());
+		R2.multiplyMatrixRight(Matrix(Vector(centeredControlPoints[j].getX(),centeredControlPoints[j].getY()),
+									  Vector(centeredControlPoints[j].getX(),centeredControlPoints[j].getY()).perpendicularVector(),0));
+		R2.multiplyMatrix(w);
+		R.addMatrix(R2);
+	}
+	float mu = sqrt(mu1*mu1+mu2*mu2);
+	//cout << "mu: " << mu << endl;
+	R.multiplyMatrix(1.0f/mu);
+	//R.write();
 
+	//slides
+	//Vector t = Vector(Vector(centroidQ.getX(),centroidQ.getY()).subtractedVector(R.multipliedVector(Vector(centroidP.getX(),centroidP.getY()))));
+	
+	// paper
+	Vector t = Vector(Vector(centroidP.getX(),centroidP.getY()).subtractedVector(R.multipliedVector(Vector(centroidQ.getX(),centroidQ.getY()))));
+	
+	//cout << "original: " << vertices[i].getX() << " " << vertices[i].getY() << endl;
+	Vector transformed = R.multipliedVector(Vector(v));
+	//cout << "transformed: " << transformed.getX() << " " << transformed.getY() << endl;
+	transformed.addVector(t);
+	return transformed;
 }
 
 void MyPolygon::transformPolygon(){
-	for(int i=0; i<4; i++){
-		for(unsigned int j=0; j<controlPoints.size(); j++){
-			float w = 1/sqrt(pow((double)vertices[i].getX()-(double)oldControlPoints[j].getX(),2.0)+pow((double)vertices[i].getY()-(double)oldControlPoints[j].getY(),2.0));
-			float mu1 = 0;
-			float mu2 = 0;
-			float R1 = 0;
-			
-			
-			//vertices[i].move(vertices[i].getX()+(controlPoints[j].getX()-oldControlPoints[j].getX())*w,vertices[i].getY()+(controlPoints[j].getY()-oldControlPoints[j].getY())*w);
-		}
-		double mu = 1.0;//sqrt(1);
+	for(int i=0; i<1; i++){
+		//Vector v = AsSimilarAsPossible(vertices[i]);
+		Vector v = AsRigidAsPossible(vertices[i]);
+		vertices[i].move(v.getX(), v.getY());
 	}
 }
 
@@ -407,7 +487,7 @@ void mouse(int btn, int state, int x, int y)
 		for (unsigned int i=0; i<controlPoints.size(); i++)
 			controlPoints[i].setDeselected();
 		setCentroids();
-		transformPolygons();
+		//transformPolygons();
         glutPostRedisplay();
     }
     if(btn==GLUT_RIGHT_BUTTON && state==GLUT_DOWN)   
